@@ -1,0 +1,19 @@
+[project]
+name = "rescue-perception-py"
+version = "0.1.0"
+description = "Pure Python implementation of the tunnel fire rescue robot perception framework"
+requires-python = ">=3.8"
+dependencies = ["numpy>=1.20", "PyYAML>=5.4"]
+
+[project.optional-dependencies]
+yolo = ["ultralytics>=8.3"]
+
+[build-system]
+requires = ["setuptools>=61"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools.packages.find]
+include = ["rescue_perception*"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]

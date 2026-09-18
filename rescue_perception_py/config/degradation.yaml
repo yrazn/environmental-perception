@@ -1,0 +1,28 @@
+degradation:
+  transitions:
+    clear_to_lowvis:
+      smoke_score_above: 0.15
+      rgb_credibility_below: 0.5
+      brightness_below: 30
+    lowvis_to_heavy:
+      smoke_score_above: 0.35
+      rgb_lidar_both_below: [0.2, 0.3]
+    heavy_to_degraded:
+      all_sensors_below: [0.1, 0.2, 0.3]
+    hysteresis_factor: 0.2
+  weights:
+    clear:        [0.90, 0.40, 0.85, 0.30, 0.20, 0.20]
+    low_vis:      [0.50, 0.80, 0.60, 0.50, 0.30, 0.40]
+    heavy_smoke:  [0.10, 0.85, 0.25, 0.85, 0.50, 0.60]
+    degraded:     [0.00, 0.30, 0.00, 0.80, 0.60, 0.60]
+  behavior:
+    clear:        {max_speed_pct: 100, require_confirmation: false, allow_autonomous: true}
+    low_vis:      {max_speed_pct: 80,  require_confirmation: false, allow_autonomous: true}
+    heavy_smoke:  {max_speed_pct: 30,  require_confirmation: true,  allow_autonomous: true}
+    degraded:     {max_speed_pct: 10,  require_confirmation: true,  allow_autonomous: false, suggest_teleop: true}
+  depth_priority:
+    - [lidar, stereo, laser_range, mmwave, ground_project]
+    - [lidar, mmwave, laser_range, stereo, ground_project]
+    - [mmwave, thermal_lidar_proj, laser_range, ground_project]
+    - [mmwave, tof, uwb_position, ground_project]
+

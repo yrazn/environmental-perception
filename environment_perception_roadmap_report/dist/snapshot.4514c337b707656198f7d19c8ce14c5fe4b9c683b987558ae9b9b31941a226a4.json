@@ -1,0 +1,57 @@
+{
+  "title": "先完成可验证的单设备基线，再推进多设备融合",
+  "status": "reviewed",
+  "generatedAt": "2026-09-18T00:00:00+08:00",
+  "filters": [],
+  "surface": "report",
+  "id": "report:5fe060b0-a382-48ee-b2a1-eeb85881c81d",
+  "buildStatus": "creating",
+  "report": {
+    "audience": "technical",
+    "asOf": "2026-09-18",
+    "subtitle": "环境感知系统后续开发与模型训练路线：设备级训练、统一接口、目标级融合、实机闭环验证",
+    "showTables": true
+  },
+  "queries": {
+    "dataset_catalog": {
+      "rows": [
+        {"device":"RGB摄像机","task":"人员/车辆检测","primary":"COCO预训练 + FLIR RGB","secondary":"MID-3K RGB、自采数据","method":"YOLO11n检测","priority":"P0","directUse":"高"},
+        {"device":"RGB摄像机","task":"火焰/烟雾检测","primary":"D-Fire","secondary":"FASDD-CV、TunnelFire2024、自采负样本","method":"YOLO11n/s检测；后续烟雾分割","priority":"P0","directUse":"高"},
+        {"device":"红外热成像","task":"人员/车辆检测","primary":"FLIR ADAS Thermal","secondary":"MID-3K、LLVIP、KAIST、自采热图","method":"YOLO11n检测","priority":"P0","directUse":"中高"},
+        {"device":"红外热成像","task":"火源/过热设备","primary":"实机辐射温度数据","secondary":"IGNITE、FLAME3","method":"温度规则；后续YOLO11-seg候选区域","priority":"P1","directUse":"中"},
+        {"device":"3D LiDAR","task":"人员/车辆/障碍物","primary":"现有聚类算法 + 自采Mid-360","secondary":"JRDB、nuScenes、MID-3K","method":"RANSAC+聚类+包围盒；后续CenterPoint","priority":"P1/P2","directUse":"中"},
+        {"device":"4D毫米波雷达","task":"人员/车辆跟踪","primary":"VoD或TJ4DRadSet","secondary":"RadarScenes、自采SR75","method":"过滤+卡尔曼+规则；后续点云网络","priority":"P1/P2","directUse":"中"},
+        {"device":"AWR1843毫米波","task":"RA/RD/RAD信号处理","primary":"CARRADA","secondary":"自采ADC/点云","method":"FFT/CFAR/聚类或张量网络","priority":"按硬件分支","directUse":"中低"},
+        {"device":"二维LiDAR","task":"近场避障","primary":"实机rosbag","secondary":"仿真场景","method":"扇区距离+聚类+安全阈值","priority":"P0","directUse":"高"},
+        {"device":"气体/PM/温湿度","task":"环境风险与火情趋势","primary":"实机标定数据","secondary":"MmodalFire、UCI Gas Drift","method":"阈值+趋势+漂移补偿","priority":"P0/P1","directUse":"中"},
+        {"device":"IMU/里程计","task":"位姿和坐标转换","primary":"实机标定与rosbag","secondary":"UMA-SAR、Oxford Radar RobotCar","method":"时间同步+外参+状态估计","priority":"P0","directUse":"中"}
+      ],
+      "source": {
+        "label": "项目代码、已提供数据集分析文档及官方数据集页面的复核结果",
+        "filters": ["设备范围来自 perception_master.yaml", "公开数据用于预训练，实机同步数据用于最终验证"],
+        "metricDefinitions": [
+          {"label":"优先级","definition":"P0为基础系统闭环所需；P1为提高可靠性；P2为论文或高阶模型扩展。","componentIds":["device-training-matrix"]},
+          {"label":"直接适用性","definition":"公开数据与当前设备输出格式、视角和任务的匹配程度；不是数据质量评分。","componentIds":["device-training-matrix"]}
+        ]
+      }
+    },
+    "roadmap": {
+      "rows": [
+        {"phase":"0. 数据与接口冻结","weeks":"第1–2周","deliverable":"类别字典、目录规范、序列级划分、标定模板","gate":"数据可复现且无明显序列泄漏"},
+        {"phase":"1. RGB基线","weeks":"第3–6周","deliverable":"人员车辆模型、火焰烟雾模型、统一双模型后端","gate":"独立测试集精度与实机速度达标"},
+        {"phase":"2. 热成像与环境量","weeks":"第7–10周","deliverable":"热成像目标模型、温度规则、传感器标定曲线","gate":"正常热源和真实火源可区分"},
+        {"phase":"3. LiDAR/雷达基线","weeks":"第11–14周","deliverable":"实机点云适配、目标跟踪、坐标和时间同步","gate":"连续轨迹稳定且误关联可控"},
+        {"phase":"4. 目标级融合","weeks":"第15–18周","deliverable":"人员、车辆、火情三条融合链和退化策略","gate":"缺失单一传感器时系统仍能输出可信结果"},
+        {"phase":"5. 实机闭环与消融","weeks":"第19–22周","deliverable":"同步测试集、消融实验、YOLO11/YOLO26对比","gate":"指标、延迟和安全策略均通过"},
+        {"phase":"6. 论文与部署固化","weeks":"第23–24周","deliverable":"TensorRT权重、版本清单、复现实验和论文表格","gate":"从原始数据到结果可一键复现"}
+      ],
+      "source": {
+        "label": "基于当前项目模块成熟度制定的建议性研发排期",
+        "filters": ["24周建议计划", "实际周期受设备到位、标注量和GPU资源影响"],
+        "metricDefinitions": [
+          {"label":"阶段门槛","definition":"进入下一阶段前必须满足的可验证条件，不代表承诺日期。","componentIds":["delivery-roadmap"]}
+        ]
+      }
+    }
+  }
+}

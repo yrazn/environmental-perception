@@ -1,0 +1,66 @@
+perception:
+  system:
+    pipeline_rate: 100.0
+    run_mode: "rescue"
+    frame_id_map: "map"
+    frame_id_odom: "odom"
+    frame_id_base: "base_link"
+    target_hardware: "jetson_agx_orin"
+  sensors:
+    rgb_front: true
+    rgb_ptz: true
+    thermal: true
+    lidar_3d: true
+    radar_4d: true
+    lidar_2d_front: true
+    lidar_2d_rear: true
+    gas_sensors: true
+    pm_sensors: true
+    temperature_humidity: true
+  detectors:
+    flame_detection: true
+    smoke_detection: true
+    person_detection: true
+    vehicle_detection: true
+    crack_detection: true
+    water_detection: true
+    facility_inspection: true
+    rgb_detector:
+      # synthetic 用于内置仿真；yolo 使用官方 COCO 基准权重。
+      backend: "synthetic"
+      model_path: "yolo11n.pt"
+      device: "cpu"
+      image_size: 640
+      inference_confidence: 0.25
+      nms_iou_threshold: 0.50
+      # 单目框高测距的初始值，正式部署时应替换为标定后的相机参数。
+      focal_length_px: 640.0
+      camera_height_m: 1.0
+    thermal_detector:
+      # 人体与火源使用不同温差通道，避免“背景+30℃”漏检人体。
+      person_min_temperature: 24.0
+      person_max_temperature: 44.0
+      person_background_delta: 3.0
+      person_min_area_pixels: 12
+      person_aspect_ratio_min: 0.4
+      person_aspect_ratio_max: 4.0
+      hotspot_background_delta: 30.0
+      hotspot_sigma_multiplier: 3.0
+      # 排除高温核心邻域，降低火焰边缘被识别成人体的概率。
+      hot_exclusion_radius_pixels: 2
+  modes:
+    inspection:
+      crack_detection: true
+      water_detection: true
+      facility_inspection: true
+      person_detection: false
+    rescue:
+      crack_detection: false
+      water_detection: false
+      facility_inspection: false
+      person_detection: true
+    minimal:
+      crack_detection: false
+      water_detection: false
+      facility_inspection: false
+      person_detection: true

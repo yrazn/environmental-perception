@@ -1,0 +1,33 @@
+.perception-roadmap,
+.perception-roadmap .report-sortable-sections {
+  gap: 44px;
+}
+
+.perception-roadmap {
+  --data-app-layout-intent: authored-report;
+  --data-app-content-width: 1080px;
+}
+
+.perception-roadmap .report-summary {
+  border-left: 4px solid var(--accent);
+  padding-left: 22px;
+}
+
+.perception-roadmap [data-component-kind="table"] {
+  margin-top: 20px;
+}
+
+.perception-roadmap .report-deck {
+  max-width: 850px;
+}
+
+@media (max-width: 720px) {
+  .perception-roadmap,
+  .perception-roadmap .report-sortable-sections {
+    gap: 30px;
+  }
+
+  .perception-roadmap .report-summary {
+    padding-left: 14px;
+  }
+}

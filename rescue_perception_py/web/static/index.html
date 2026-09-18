@@ -1,0 +1,101 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; connect-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:">
+  <title>环境感知可视化</title>
+  <link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+  <header class="topbar">
+    <div class="brand-block">
+      <div class="brand">应急环境感知</div>
+      <div class="brand-subtitle"><span id="connectionDot" class="connection-dot"></span><span id="connectionText">正在连接</span></div>
+    </div>
+    <div class="status-grid">
+      <div class="status-chip" id="runModeChip">
+        <span class="label">任务模式</span>
+        <span class="value" id="runMode">--</span>
+      </div>
+      <div class="status-chip" id="modeChip">
+        <span class="label">感知模式</span>
+        <span class="value" id="mode">--</span>
+      </div>
+      <div class="status-chip" id="statusChip">
+        <span class="label">状态</span>
+        <span class="value" id="status">--</span>
+      </div>
+      <div class="status-chip" id="riskChip">
+        <span class="label">环境风险</span>
+        <span class="value" id="envRisk">--</span>
+      </div>
+      <div class="status-chip emphasis" id="actionChip">
+        <span class="label">安全动作</span>
+        <span class="value" id="safetyAction">--</span>
+      </div>
+      <div class="status-chip" id="speedChip">
+        <span class="label">限速</span>
+        <span class="value" id="speedLimit">--</span>
+      </div>
+      <div class="status-chip">
+        <span class="label">时间</span>
+        <span class="value" id="clock">--</span>
+      </div>
+    </div>
+  </header>
+
+  <main class="layout">
+    <section class="panel left-panel">
+      <div class="section-title"><h2>传感器融合</h2><span class="section-hint">权重 / 可信度</span></div>
+      <div id="sensorWeights" class="sensor-list"></div>
+
+      <div class="section-title section-gap"><h2>环境状态</h2></div>
+      <div id="envMetrics" class="metric-list"></div>
+
+      <div class="section-title section-gap"><h2>热成像</h2></div>
+      <div id="thermalMetrics" class="metric-list"></div>
+    </section>
+
+    <section class="panel map-panel">
+      <div class="panel-head">
+        <div class="section-title"><h2>态势俯视图</h2><span class="live-badge">LIVE</span></div>
+        <div class="controls">
+          <button id="pauseBtn" type="button">暂停</button>
+          <button id="stepBtn" type="button">单步</button>
+          <button id="resetBtn" type="button">重置</button>
+          <select id="speedSelect" aria-label="速度">
+            <option value="0.5">0.5x</option>
+            <option value="1" selected>1x</option>
+            <option value="2">2x</option>
+            <option value="5">5x</option>
+          </select>
+        </div>
+      </div>
+      <div class="canvas-wrap">
+        <canvas id="map" width="900" height="560"></canvas>
+        <div id="mapSummary" class="map-summary">等待感知数据</div>
+      </div>
+    </section>
+
+    <section class="panel right-panel">
+      <div class="section-title"><h2>目标跟踪</h2><span id="targetCount" class="count-badge">0</span></div>
+      <div id="targetList" class="target-list"></div>
+      <div class="section-title section-gap"><h2>巡检结果</h2><span id="inspectionCount" class="count-badge">0</span></div>
+      <div id="inspectionList" class="metric-list"></div>
+    </section>
+
+    <section class="panel chart-panel">
+      <div class="section-title"><h2>烟雾与融合权重趋势</h2><span class="section-hint">最近 600 帧</span></div>
+      <canvas id="chart" width="900" height="240"></canvas>
+    </section>
+
+    <section class="panel events-panel">
+      <div class="section-title"><h2>风险事件</h2><span id="eventCount" class="count-badge danger">0</span></div>
+      <ul id="eventList" class="event-list"></ul>
+    </section>
+  </main>
+
+  <script src="/static/app.js"></script>
+</body>
+</html>
