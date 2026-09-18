@@ -4,10 +4,10 @@ Pure Python implementation of the environment perception framework in
 `floofy-dazzling-cosmos.md`. It follows the same architecture:
 
 Detailed code documentation and the future-work roadmap are in
-[CODE_DOCUMENTATION.md](CODE_DOCUMENTATION.md) and
-[PROJECT_ANALYSIS_AND_ROADMAP.md](PROJECT_ANALYSIS_AND_ROADMAP.md).
+[CODE_DOCUMENTATION.md](rescue_perception_py/CODE_DOCUMENTATION.md) and
+[PROJECT_ANALYSIS_AND_ROADMAP.md](rescue_perception_py/PROJECT_ANALYSIS_AND_ROADMAP.md).
 The consolidated subsystem implementation report is in
-[ENVIRONMENT_PERCEPTION_IMPLEMENTATION_REPORT.md](ENVIRONMENT_PERCEPTION_IMPLEMENTATION_REPORT.md).
+[ENVIRONMENT_PERCEPTION_IMPLEMENTATION_REPORT.md](rescue_perception_py/ENVIRONMENT_PERCEPTION_IMPLEMENTATION_REPORT.md).
 
 - sensor-level detectors: RGB, thermal, LiDAR, 4D mmWave, smoke, gas
 - target-level fusion: person / fire / vehicle
