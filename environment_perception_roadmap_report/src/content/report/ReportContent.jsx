@@ -32,6 +32,18 @@ const sourcePreviews = {
   },
 };
 
+function DatasetLinks({ items, fallback }) {
+  if (!Array.isArray(items) || items.length === 0) return fallback;
+  return <span className="dataset-links">
+    {items.map((item, index) => <React.Fragment key={`${item.label}-${index}`}>
+      {index > 0 && <span className="dataset-link-separator" aria-hidden="true"> · </span>}
+      {item.url
+        ? <a href={item.url} target="_blank" rel="noreferrer">{item.label}</a>
+        : <span>{item.label}</span>}
+    </React.Fragment>)}
+  </span>;
+}
+
 export function ReportContent() {
   const { snapshot, queries, visible, canEdit, mode, appTitle, setAppTitle } = useDataApp();
   const datasets = queries.dataset_catalog?.rows ?? [];
@@ -81,11 +93,14 @@ export function ReportContent() {
           description="每行对应一个设备任务、首选数据来源和建议实现方法。">
           <RichNarrative id="device-matrix-intro" sourcePreviews={sourcePreviews} value={`## 2. 不同设备应分别训练或标定
 
-公开数据主要解决预训练和算法可行性，真实设备数据解决域差异、坐标外参、量纲和最终验收。MID-3K只承担人员多模态验证；车辆由FLIR、nuScenes、VoD等承担；火情由D-Fire、热成像辐射数据和环境量承担。`} />
+公开数据主要解决预训练和算法可行性，真实设备数据解决域差异、坐标外参、量纲和最终验收。MID-3K只承担人员多模态验证；车辆由FLIR、nuScenes、VoD等承担；火情由D-Fire、热成像辐射数据和环境量承担。表格中的蓝色数据集名称可以直接打开对应的官方或项目页面。`} />
           <DataTable id="device-training-table" queryId="dataset_catalog" rows={datasets}
             columns={[
               { key: "device", label: "设备" }, { key: "task", label: "任务" },
-              { key: "primary", label: "首选数据" }, { key: "secondary", label: "补充数据" },
+              { key: "primary", label: "首选数据",
+                renderCell: (value, row) => <DatasetLinks items={row.primaryLinks} fallback={value} /> },
+              { key: "secondary", label: "补充数据",
+                renderCell: (value, row) => <DatasetLinks items={row.secondaryLinks} fallback={value} /> },
               { key: "method", label: "首版方法" }, { key: "priority", label: "优先级" },
             ]} />
         </ReportSection>

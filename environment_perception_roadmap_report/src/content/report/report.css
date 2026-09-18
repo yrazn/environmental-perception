@@ -21,6 +21,18 @@
   max-width: 850px;
 }
 
+.perception-roadmap .dataset-links a {
+  color: var(--accent);
+  font-weight: 650;
+  text-decoration: underline;
+  text-decoration-thickness: 1px;
+  text-underline-offset: 2px;
+}
+
+.perception-roadmap .dataset-link-separator {
+  color: var(--muted-foreground);
+}
+
 @media (max-width: 720px) {
   .perception-roadmap,
   .perception-roadmap .report-sortable-sections {
