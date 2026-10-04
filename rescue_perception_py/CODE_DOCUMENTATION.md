@@ -210,9 +210,12 @@ rescue_perception_py/
 
 #### yolo_backend.py
 
-- 使用 Ultralytics 官方 `yolo11n.pt` COCO 权重完成基准推理
+- 同一帧运行两个职责互补的模型：官方 `yolo11n.pt` 负责人员/车辆，
+  联合训练权重负责火焰/烟雾
 - 将 `xyxy`、置信度和模型类别映射为统一 `Detection3D`
-- 当前映射 person、car、truck、bus、motorcycle，忽略无关 COCO 类别
+- 当前映射 person、car、truck、bus、motorcycle、fire/flame、smoke，
+  忽略无关类别
+- 将烟雾框汇总为去重覆盖率、最高置信度和质心，供烟雾估计模块使用
 - 在无 RGB-D/LiDAR 投影时使用目标框高度粗估距离，并显式设置
   `depth_valid=False`
 - Ultralytics 为可选依赖，合成演示和测试不会强制加载模型
@@ -583,8 +586,9 @@ python3 -m compileall -q rescue_perception scripts tests
 
 ## 13. 已知限制
 
-- RGB 已接入 Ultralytics YOLO 官方 COCO 基准模型；目前只覆盖人员和常见
-  车辆，单目距离仍是近似值，火焰/烟雾需要专用模型
+- RGB 已接入官方 COCO 模型与 D-Fire + Indoor Fire Smoke 联合模型；可同时
+  检测人员、常见车辆、火焰和烟雾，但单目距离仍是近似值
+- 联合火情模型已完成两个独立测试集验证，尚缺真实隧道域数据与视频时序验证
 - 热成像人员检测使用温度/尺寸启发式，未接入分类模型
 - LiDAR 聚类使用纯 NumPy，点云规模增大后需要优化
 - 雷达跟踪使用简化 2D 坐标，未接入真实雷达点云

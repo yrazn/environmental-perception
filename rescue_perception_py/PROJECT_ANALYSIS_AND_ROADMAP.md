@@ -181,10 +181,11 @@ CLEAR -> LOW_VISIBILITY -> HEAVY_SMOKE -> PERCEPTION_DEGRADED
 4. 对连续帧位置稳定的火焰提高置信度；
 5. 根据烟雾掩膜或后端属性计算烟雾概率、覆盖率和质心。
 
-当前已实现 Ultralytics YOLO 基准后端，默认采用官方 `yolo11n.pt` COCO
-权重，可识别人员和常见车辆。合成演示仍默认使用
-`rescue_perception/sim/backends.py` 中的 `SyntheticRgbBackend`。火焰、烟雾、
-人员姿态和可靠三维深度仍需专用模型及传感器标定。
+当前已实现Ultralytics YOLO双模型后端：官方`yolo11n.pt`识别人员和常见车辆，
+D-Fire与Indoor Fire Smoke联合训练权重识别火焰和烟雾。两路结果在
+`yolo_backend.py`中统一映射为`Detection3D`，烟雾框还会转换成覆盖率、
+概率和质心。主配置已启用GPU联合推理；人员姿态、真实隧道域适配和可靠
+三维深度仍需专用数据、训练及传感器标定。
 
 ### 6.2 热成像检测
 

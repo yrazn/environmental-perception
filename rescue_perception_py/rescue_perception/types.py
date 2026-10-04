@@ -460,6 +460,30 @@ class SafetyDecision:
 
 
 @dataclass
+class Lidar2DSafetyResult:
+    """前后二维激光雷达生成的近场安全摘要。"""
+    nearest_range: float = float("inf")
+    front_range: float = float("inf")
+    rear_range: float = float("inf")
+    warning_level: int = 0
+    valid_ratio: float = 0.0
+    blocked_sectors: List[str] = field(default_factory=list)
+
+    def to_dict(self) -> Dict[str, Any]:
+        def finite_or_none(value: float) -> Optional[float]:
+            return round(float(value), 3) if np.isfinite(value) else None
+
+        return {
+            "nearest_range": finite_or_none(self.nearest_range),
+            "front_range": finite_or_none(self.front_range),
+            "rear_range": finite_or_none(self.rear_range),
+            "warning_level": self.warning_level,
+            "valid_ratio": round(self.valid_ratio, 3),
+            "blocked_sectors": list(self.blocked_sectors),
+        }
+
+
+@dataclass
 class RiskAssessment:
     risk_level: EnvironmentRisk = EnvironmentRisk.LOW
     combined_score: float = 0.0
@@ -492,6 +516,7 @@ class PipelineOutput:
     gas: GasRiskResult = field(default_factory=GasRiskResult)
     risk: RiskAssessment = field(default_factory=RiskAssessment)
     safety: SafetyDecision = field(default_factory=SafetyDecision)
+    lidar2d_safety: Lidar2DSafetyResult = field(default_factory=Lidar2DSafetyResult)
     thermal_risk_level: int = 0
     cracks: List["CrackDefect"] = field(default_factory=list)
     water_regions: List["WaterRegion"] = field(default_factory=list)
@@ -506,6 +531,7 @@ class PipelineOutput:
             "weights": self.weights.to_dict(),
             "env_risk": int(self.risk.risk_level),
             "safety": self.safety.to_dict(),
+            "lidar2d_safety": self.lidar2d_safety.to_dict(),
             "smoke": self.smoke.to_dict(),
             "gas": self.gas.to_dict(),
             "targets": [t.to_dict() for t in self.targets],

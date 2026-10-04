@@ -136,6 +136,27 @@ class TunnelScenario:
                 })
         return targets
 
+    def _lidar2d_scans(self) -> Dict[str, Dict]:
+        """生成前后180度扫描，用于验证独立近场安全链。"""
+        angle_min = -np.pi / 2.0
+        angle_increment = np.pi / 180.0
+        front = np.full(181, 20.0, dtype=float)
+        rear = np.full(181, 20.0, dtype=float)
+        for obj in self.objects:
+            x, y = float(obj["x"]), float(obj["y"])
+            if x <= 0.0:
+                continue
+            angle = float(np.arctan2(y, x))
+            index = int(round((angle - angle_min) / angle_increment))
+            if 0 <= index < len(front):
+                front[index] = min(front[index], float(np.hypot(x, y)))
+        return {
+            "front": {"ranges": front, "angle_min": angle_min,
+                      "angle_increment": angle_increment},
+            "rear": {"ranges": rear, "angle_min": angle_min,
+                     "angle_increment": angle_increment},
+        }
+
     def _gas(self, t: float) -> GasReadings:
         smoke = self.smoke_level(t)
         return GasReadings(
@@ -161,6 +182,7 @@ class TunnelScenario:
             temperature_matrix=self._thermal_matrix(t),
             lidar_points=self._lidar_points(t),
             radar_targets=self._radar_targets(t),
+            scans=self._lidar2d_scans(),
             gas=self._gas(t),
             pm={"pm25": smoke * 420.0, "pm10": smoke * 500.0},
             temperature_humidity={"temperature": 25.0 + smoke * 35.0,

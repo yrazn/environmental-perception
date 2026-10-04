@@ -97,6 +97,23 @@ class QualityMonitor:
         return clamp(stability * 0.5 + rcs_score * 0.5)
 
     @staticmethod
+    def _lidar2d_metrics(scans: Optional[Dict]) -> float:
+        """根据有限、正距离量测比例评估二维激光扫描可用性。"""
+        if not scans:
+            return 0.0
+        ratios = []
+        for payload in scans.values():
+            values = payload.get("ranges", []) if isinstance(payload, dict) else payload
+            ranges = np.asarray(values, dtype=float).reshape(-1)
+            if len(ranges) == 0:
+                ratios.append(0.0)
+                continue
+            ratios.append(float(np.mean(np.isfinite(ranges)
+                                        & (ranges >= 0.05)
+                                        & (ranges <= 30.0))))
+        return clamp(float(np.mean(ratios))) if ratios else 0.0
+
+    @staticmethod
     def _gas_metrics(synced: SyncedSensorData) -> float:
         humidity = 50.0
         if synced.temperature_humidity:
@@ -116,6 +133,7 @@ class QualityMonitor:
         lidar = self._lidar_metrics(synced.lidar_points, lidar_quality)
         radar_c = self._radar_metrics(radar_targets if radar_targets is not None
                                       else synced.radar_targets)
+        lidar2d_c = self._lidar2d_metrics(synced.scans)
         gas_c = self._gas_metrics(synced) if synced.gas is not None else 0.0
         pm_available = (synced.pm is not None or
                         (synced.gas is not None
@@ -127,7 +145,7 @@ class QualityMonitor:
         env.credibility[SensorType.LIDAR_3D] = SensorCredibility(
             lidar["credibility"], lidar["effective_ratio"])
         env.credibility[SensorType.LIDAR_2D] = SensorCredibility(
-            clamp(lidar["credibility"] * 0.8), lidar["effective_ratio"])
+            lidar2d_c, lidar2d_c)
         env.credibility[SensorType.RADAR_4D] = SensorCredibility(radar_c)
         env.credibility[SensorType.GAS] = SensorCredibility(gas_c, gas_c)
         env.credibility[SensorType.PM] = SensorCredibility(

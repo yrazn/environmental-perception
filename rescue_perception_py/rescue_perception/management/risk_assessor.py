@@ -37,15 +37,17 @@ class RiskAssessor:
                  gas: GasRiskResult,
                  thermal_risk: int,
                  mode: DegradationMode,
-                 radar_nearest: float) -> Dict[str, float]:
+                 radar_nearest: float,
+                 lidar2d_nearest: float = float("inf")) -> Dict[str, float]:
         """把不同量纲的输入转换为 0～1 风险因子。"""
         thermal = thermal_risk / 4.0
         gas_factor = gas.risk_level / 3.0
-        if radar_nearest < 2.0:
+        nearest_obstacle = min(radar_nearest, lidar2d_nearest)
+        if nearest_obstacle < 2.0:
             obstacle = 1.0
-        elif radar_nearest < 5.0:
+        elif nearest_obstacle < 5.0:
             obstacle = 0.6
-        elif radar_nearest < 10.0:
+        elif nearest_obstacle < 10.0:
             obstacle = 0.3
         else:
             obstacle = 0.0
@@ -67,10 +69,11 @@ class RiskAssessor:
                thermal_risk_level: int,
                mode: DegradationMode,
                radar_nearest_range: float,
-               is_estop: bool = False) -> RiskAssessment:
+               is_estop: bool = False,
+               lidar2d_nearest_range: float = float("inf")) -> RiskAssessment:
         """计算综合环境风险、热区和离散事件。"""
         factors = self._factors(tracks, env, gas, thermal_risk_level, mode,
-                                radar_nearest_range)
+                                radar_nearest_range, lidar2d_nearest_range)
         if mode >= DegradationMode.HEAVY_SMOKE:
             w = self.weights["heavy"]
         elif mode == DegradationMode.LOW_VISIBILITY:
@@ -150,24 +153,26 @@ class RiskAssessor:
                       thermal_risk_level: int,
                       mode: DegradationMode,
                       radar_nearest_range: float,
-                      is_estop: bool = False) -> SafetyDecision:
+                      is_estop: bool = False,
+                      lidar2d_nearest_range: float = float("inf")) -> SafetyDecision:
         """把环境风险映射为速度上限、停车要求和远程确认要求。"""
+        nearest_obstacle = min(radar_nearest_range, lidar2d_nearest_range)
         if is_estop:
             return SafetyDecision(SafetyLevel.SAFETY_ESTOP, 0.0,
                                   "IMMEDIATE_ESTOP", False)
         if (thermal_risk_level >= 4
                 or mode == DegradationMode.PERCEPTION_DEGRADED
-                or radar_nearest_range < 1.0):
+                or nearest_obstacle < 1.0):
             return SafetyDecision(SafetyLevel.SAFETY_STOP_REQUIRED, 0.0,
                                   "STOP_AND_WAIT", True)
         if (thermal_risk_level >= 3
                 or env_risk >= EnvironmentRisk.HIGH
-                or radar_nearest_range < 3.0):
+                or nearest_obstacle < 3.0):
             return SafetyDecision(SafetyLevel.SAFETY_DEGRADED, 0.20,
                                   "LOW_SPEED_CAUTIOUS", True)
         if (thermal_risk_level >= 2
                 or mode >= DegradationMode.LOW_VISIBILITY
-                or radar_nearest_range < 5.0):
+                or nearest_obstacle < 5.0):
             return SafetyDecision(SafetyLevel.SAFETY_WARNING, 0.50,
                                   "REDUCED_SPEED", False)
         return SafetyDecision(SafetyLevel.SAFETY_OK, 1.0,

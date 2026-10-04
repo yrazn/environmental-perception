@@ -21,7 +21,9 @@ from rescue_perception.sim.backends import (
 from rescue_perception.sim.scenario import TunnelScenario
 from rescue_perception.types import (
     ObjectClass,
+    SafetyLevel,
     SourceMask,
+    SyncedSensorData,
     TrackedObject,
     VisibilityLevel,
 )
@@ -81,6 +83,24 @@ class LocalizationAndClassesTest(unittest.TestCase):
 
 
 class PipelineIntegrationTest(unittest.TestCase):
+    def test_lidar2d_near_obstacle_reaches_stop_decision(self):
+        cfg = PerceptionConfig.from_dict({
+            "sensors": {
+                "rgb_front": False, "rgb_ptz": False, "thermal": False,
+                "lidar_3d": False, "radar_4d": False,
+                "lidar_2d_front": True, "lidar_2d_rear": False,
+                "gas_sensors": False, "pm_sensors": False,
+                "temperature_humidity": False,
+            },
+        })
+        ranges = np.full(181, 10.0)
+        ranges[90] = 0.4
+        output = PerceptionPipeline(cfg).spin_once(
+            SyncedSensorData(scans={"front": ranges}), now=0.0)
+        self.assertEqual(output.lidar2d_safety.warning_level, 3)
+        self.assertEqual(output.safety.safety_level,
+                         SafetyLevel.SAFETY_STOP_REQUIRED)
+
     def test_independent_pm_input_has_priority(self):
         scenario = TunnelScenario(smoke_curve=lambda _: 0.0)
         frame = scenario.frame(0.0)

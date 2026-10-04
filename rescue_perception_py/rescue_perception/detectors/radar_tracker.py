@@ -23,6 +23,8 @@ class _RadarTrack:
     rcs: float = 0.0
     doppler: float = 0.0
     micro_doppler: bool = False
+    z: float = 0.0
+    vz: float = 0.0
 
 
 class RadarTracker:
@@ -46,12 +48,22 @@ class RadarTracker:
         self._nearest_range = float("inf")
 
     @staticmethod
-    def _to_xy(target: Dict) -> np.ndarray:
+    def _to_xyz(target: Dict) -> np.ndarray:
         if "x" in target and "y" in target:
-            return np.array([target["x"], target["y"]], dtype=float)
+            return np.array([target["x"], target["y"], target.get("z", 0.0)],
+                            dtype=float)
         r = float(target["range"])
         az = float(target.get("azimuth", 0.0))
-        return np.array([r * np.cos(az), r * np.sin(az)])
+        el = float(target.get("elevation", 0.0))
+        horizontal = r * np.cos(el)
+        return np.array([horizontal * np.cos(az), horizontal * np.sin(az),
+                         r * np.sin(el)])
+
+    def _micro_doppler(self, target: Dict) -> bool:
+        """兼容设备布尔结果和设备输出的微多普勒幅值。"""
+        if "micro_doppler_amplitude" in target:
+            return abs(float(target["micro_doppler_amplitude"])) >= self.micro_amp
+        return bool(target.get("micro_doppler", False))
 
     def _filter(self, targets: List[Dict[str, float]], now: float) -> List[Dict[str, float]]:
         """保留运动目标、高 RCS 目标和持续出现的静态目标。"""
@@ -79,6 +91,7 @@ class RadarTracker:
             f[2, 4] = dt
             f[3, 5] = dt
             tr.cov = f @ tr.cov @ f.T + self.q * dt
+            tr.z += tr.vz * dt
 
     def _update(self, tr: _RadarTrack, xy: np.ndarray) -> None:
         h = np.zeros((2, 6))
@@ -88,6 +101,24 @@ class RadarTracker:
         s = h @ tr.cov @ h.T + self.r
         k = tr.cov @ h.T @ np.linalg.inv(s)
         tr.state += k @ innovation
+        tr.cov = (np.eye(6) - k @ h) @ tr.cov
+
+    def _update_doppler(self, tr: _RadarTrack, xy: np.ndarray,
+                        doppler: float) -> None:
+        """把径向Doppler作为速度观测，而不是只保存为附加属性。"""
+        norm = float(np.linalg.norm(xy))
+        if norm < 1e-6 or not np.isfinite(doppler):
+            return
+        unit = xy / norm
+        h = np.zeros((1, 6))
+        h[0, 2] = unit[0]
+        h[0, 3] = unit[1]
+        innovation = np.array([doppler - float(h @ tr.state)])
+        doppler_noise = max(float(self.config.detectors["radar_tracker"]
+                                  ["observation_noise"][2]), 1e-3)
+        s = h @ tr.cov @ h.T + np.array([[doppler_noise]])
+        k = tr.cov @ h.T @ np.linalg.inv(s)
+        tr.state += (k @ innovation).reshape(-1)
         tr.cov = (np.eye(6) - k @ h) @ tr.cov
 
     def _associate(self, xy_list: List[np.ndarray]) -> List[Tuple[int, int]]:
@@ -137,7 +168,8 @@ class RadarTracker:
             return []
 
         filtered = self._filter(targets, now)
-        xy_list = [self._to_xy(t) for t in filtered]
+        xyz_list = [self._to_xyz(t) for t in filtered]
+        xy_list = [xyz[:2] for xyz in xyz_list]
         self._predict(max(dt, 1e-3))
 
         matched = self._associate(xy_list)
@@ -152,7 +184,11 @@ class RadarTracker:
             tr.last_seen = now
             tr.rcs = float(t.get("rcs", tr.rcs))
             tr.doppler = float(t.get("doppler", tr.doppler))
-            tr.micro_doppler = bool(t.get("micro_doppler", False))
+            self._update_doppler(tr, xy_list[i], tr.doppler)
+            tr.z = 0.7 * tr.z + 0.3 * float(xyz_list[i][2])
+            rng = max(float(np.linalg.norm(xyz_list[i])), 1e-6)
+            tr.vz = 0.7 * tr.vz + 0.3 * tr.doppler * xyz_list[i][2] / rng
+            tr.micro_doppler = self._micro_doppler(t)
 
         for i, t in enumerate(filtered):
             if i in matched_cands:
@@ -160,14 +196,21 @@ class RadarTracker:
             rcs = float(t.get("rcs", -100.0))
             if rcs < self.rcs_min:
                 continue
+            doppler = float(t.get("doppler", 0.0))
+            horizontal_norm = max(float(np.linalg.norm(xy_list[i])), 1e-6)
+            radial_xy = doppler * xy_list[i] / horizontal_norm
+            full_range = max(float(np.linalg.norm(xyz_list[i])), 1e-6)
             tr = _RadarTrack(
                 track_id=self.next_id,
-                state=np.array([xy_list[i][0], xy_list[i][1], 0, 0, 0, 0]),
+                state=np.array([xy_list[i][0], xy_list[i][1],
+                                radial_xy[0], radial_xy[1], 0, 0]),
                 last_seen=now,
                 seen_frames=1,
                 rcs=rcs,
-                doppler=float(t.get("doppler", 0.0)),
-                micro_doppler=bool(t.get("micro_doppler", False)),
+                doppler=doppler,
+                micro_doppler=self._micro_doppler(t),
+                z=float(xyz_list[i][2]),
+                vz=doppler * float(xyz_list[i][2]) / full_range,
             )
             self.next_id += 1
             self.tracks.append(tr)
@@ -182,7 +225,8 @@ class RadarTracker:
         for tr in self.tracks:
             speed = float(np.linalg.norm(tr.state[2:4]))
             class_id, extra_class = self._classify(tr.rcs, speed, tr.micro_doppler)
-            confidence = 0.7 if mode >= DegradationMode.HEAVY_SMOKE else 0.5
+            # 环境模式只调整融合权重，不应凭空提高单次雷达量测置信度。
+            confidence = min(0.45 + 0.05 * max(tr.seen_frames, 1), 0.70)
             if tr.coast_frames > 0:
                 confidence *= 0.8
             rng = float(np.linalg.norm(tr.state[:2]))
@@ -191,8 +235,8 @@ class RadarTracker:
                 class_id=class_id,
                 confidence=confidence,
                 source=SensorType.RADAR_4D,
-                position=np.array([tr.state[0], tr.state[1], 0.0]),
-                velocity=np.array([tr.state[2], tr.state[3], 0.0]),
+                position=np.array([tr.state[0], tr.state[1], tr.z]),
+                velocity=np.array([tr.state[2], tr.state[3], tr.vz]),
                 extra={"rcs": tr.rcs, "doppler": tr.doppler,
                        "radar_class": extra_class,
                        "micro_doppler": tr.micro_doppler},

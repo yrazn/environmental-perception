@@ -1,0 +1,5 @@
+numpy>=1.20
+PyYAML>=5.4
+
+[yolo]
+ultralytics>=8.3

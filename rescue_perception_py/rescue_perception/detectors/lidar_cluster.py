@@ -104,7 +104,7 @@ class LidarCluster:
                         if k not in visited and np.linalg.norm(points[k][:3] - points[j][:3]) <= tol:
                             visited.add(k)
                             stack.append(k)
-            if len(cluster) >= self.min_cluster_size:
+            if self.min_cluster_size <= len(cluster) <= self.max_cluster_size:
                 clusters.append(cluster)
         return clusters
 

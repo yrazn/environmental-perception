@@ -1,0 +1,9 @@
+Metadata-Version: 2.4
+Name: rescue-perception-py
+Version: 0.1.0
+Summary: Pure Python implementation of the tunnel fire rescue robot perception framework
+Requires-Python: >=3.8
+Requires-Dist: numpy>=1.20
+Requires-Dist: PyYAML>=5.4
+Provides-Extra: yolo
+Requires-Dist: ultralytics>=8.3; extra == "yolo"

@@ -14,6 +14,7 @@ from .detectors.crack_segmenter import CrackSegmenter
 from .detectors.facility_inspector import FacilityInspector
 from .detectors.gas_risk import GasRiskAssessor
 from .detectors.lidar_cluster import LidarCluster, LidarClusterResult
+from .detectors.lidar2d_safety import Lidar2DSafety
 from .detectors.radar_tracker import RadarTracker
 from .detectors.rgb_detector import RgbDetectResult, RgbDetector
 from .detectors.smoke_estimator import SmokeEstimator
@@ -58,6 +59,7 @@ class PerceptionPipeline:
         self.rgb_detector = RgbDetector(self.config)
         self.thermal_detector = ThermalDetector(self.config)
         self.lidar_cluster = LidarCluster(self.config)
+        self.lidar2d_safety = Lidar2DSafety(self.config)
         self.radar_tracker = RadarTracker(self.config)
         self.smoke_estimator = SmokeEstimator(self.config)
         self.gas_risk = GasRiskAssessor(self.config)
@@ -246,6 +248,10 @@ class PerceptionPipeline:
         radar_tracks = (self.radar_tracker.track(
             synced.radar_targets, self.mode, now=stamp)
             if self.config.sensor_enabled("radar_4d") else [])
+        lidar2d_enabled = (self.config.sensor_enabled("lidar_2d_front")
+                           or self.config.sensor_enabled("lidar_2d_rear"))
+        lidar2d_result = self.lidar2d_safety.analyze(
+            synced.scans if lidar2d_enabled else None)
 
         # 独立 PM 传感器优先；缺失时兼容复合气体设备中的 PM 字段。
         pm_now = 0.0
@@ -318,10 +324,12 @@ class PerceptionPipeline:
         risk = self.risk_assessor.assess(
             all_tracks, self.env_quality, self.gas_risk_result,
             self.smoke_estimate, self.thermal_risk_level, self.mode,
-            radar_nearest)
+            radar_nearest,
+            lidar2d_nearest_range=lidar2d_result.nearest_range)
         safety = self.risk_assessor.map_to_safety(
             risk.risk_level, self.thermal_risk_level, self.mode,
-            radar_nearest)
+            radar_nearest,
+            lidar2d_nearest_range=lidar2d_result.nearest_range)
 
         # 对外状态是退化模式的简化表达，便于 ROS/Web 快速判断系统可用性。
         if self.mode == DegradationMode.CLEAR:
@@ -342,6 +350,7 @@ class PerceptionPipeline:
             gas=self.gas_risk_result,
             risk=risk,
             safety=safety,
+            lidar2d_safety=lidar2d_result,
             thermal_risk_level=self.thermal_risk_level,
             cracks=cracks,
             water_regions=water_regions,

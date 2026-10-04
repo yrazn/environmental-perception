@@ -26,13 +26,17 @@ perception:
     water_detection: true
     facility_inspection: true
     rgb_detector:
-      # synthetic 用于内置仿真；yolo 使用官方 COCO 基准权重。
-      backend: "synthetic"
+      # 双模型同帧推理：官方 COCO 权重负责人员/车辆，联合权重负责烟雾/火焰。
+      backend: "yolo"
       model_path: "yolo11n.pt"
-      device: "cpu"
+      fire_smoke_model_path: "/home/ubuntu/桌面/环境感知/rescue_perception_py/runs/rgb_fire_smoke/yolo11n_dfire_indoor_joint_sgd/weights/best.pt"
+      device: "0"
       image_size: 640
       inference_confidence: 0.25
+      fire_smoke_inference_confidence: 0.25
       nms_iou_threshold: 0.50
+      flame_conf_threshold: 0.35
+      smoke_conf_threshold: 0.25
       # 单目框高测距的初始值，正式部署时应替换为标定后的相机参数。
       focal_length_px: 640.0
       camera_height_m: 1.0
@@ -48,6 +52,15 @@ perception:
       hotspot_sigma_multiplier: 3.0
       # 排除高温核心邻域，降低火焰边缘被识别成人体的概率。
       hot_exclusion_radius_pixels: 2
+    lidar2d_safety:
+      # 前后二维扫描仅在正向扇区内取最近有效距离，避免侧墙长期误触发。
+      range_min: 0.05
+      range_max: 30.0
+      default_fov_deg: 180.0
+      forward_sector_half_angle_deg: 35.0
+      warning_distance_m: 2.0
+      stop_distance_m: 1.0
+      emergency_distance_m: 0.6
   modes:
     inspection:
       crack_detection: true

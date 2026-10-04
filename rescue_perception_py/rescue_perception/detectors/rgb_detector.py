@@ -44,6 +44,7 @@ class RgbDetector:
         self.config = config or PerceptionConfig()
         params = self.config.detectors["rgb_detector"]
         self.flame_conf = float(params.get("flame_conf_threshold", 0.35))
+        self.smoke_conf = float(params.get("smoke_conf_threshold", 0.25))
         self.vehicle_conf = float(params.get("vehicle_conf_threshold", 0.45))
         self.person_conf = float(params.get("person_conf_threshold", 0.40))
         self.person_min_output = float(params.get("person_min_confidence_output", 0.50))
@@ -64,6 +65,9 @@ class RgbDetector:
                 if env.rgb_credibility() < 0.1 and mode >= DegradationMode.HEAVY_SMOKE:
                     continue
                 out.append(self._verify_flame(det))
+            elif (det.class_id == ObjectClass.SMOKE
+                  and det.confidence >= self.smoke_conf):
+                out.append(det)
             elif (ObjectClass.PERSON_STANDING <= det.class_id <= ObjectClass.PERSON_OCCLUDED
                   and det.confidence >= self.person_conf):
                 if det.confidence >= self.person_min_output:

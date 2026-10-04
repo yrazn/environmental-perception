@@ -184,7 +184,7 @@ flowchart LR
     SM --> MODE["烟雾等级与感知退化"]
 ```
 
-1. RGB专用模型用于发现火焰或烟雾的视觉特征；当前官方YOLO11n不具备这些类别，因此现阶段RGB火焰主要来自合成后端。
+1. RGB采用双模型同帧推理：官方YOLO11n负责人员和常见车辆，D-Fire与Indoor Fire Smoke联合训练模型负责火焰和烟雾；两路结果统一转换为系统目标类型。
 2. 热成像检测高温核心，计算最高温度、温升速度、面积增长率、持续时间、圆形度和热点数量，区分火源、疑似火源、热设备和普通热表面。
 3. 气体模块按CO、CO₂、O₂、CH₄和H₂S分级，并组合CO/CO₂上升、O₂下降和环境升温判断火灾气体特征。
 4. 火源融合在2m范围内匹配RGB火焰与热热点，再利用气体证据调整0～4级火源等级。2级及以上作为确认火源。
@@ -285,17 +285,18 @@ flowchart TB
 
 代码：`rgb_detector.py`、`yolo_backend.py`
 
-当前提供统一`DetectionBackend.detect(image)`接口。合成后端用于测试，`YoloBackend`使用官方`yolo11n.pt`完成基准检测。
+当前提供统一`DetectionBackend.detect(image)`接口。合成后端用于测试；`YoloBackend`在同一帧依次运行官方`yolo11n.pt`和联合火焰烟雾权重，避免使用火情专用模型后丢失人员、车辆检测能力。
 
 YOLO后端处理过程：
 
 1. 输入NumPy RGB图像；
-2. 调用Ultralytics预测，配置图像尺寸、置信度和NMS IoU；
+2. 调用官方COCO模型检测人员/车辆，再调用联合模型检测火焰/烟雾；两路均配置图像尺寸、置信度和NMS IoU；
 3. 读取`xyxy`、`confidence`和`class id`；
-4. 将COCO的person、car、truck、bus、motorcycle映射到系统类别；
-5. 无关COCO类别直接忽略；
+4. 将person、car、truck、bus、motorcycle、fire/flame和smoke映射到系统类别；
+5. 无关类别直接忽略，且火情模型只接收fire/smoke输出；
 6. 转换成`Detection3D`；
-7. `RgbDetector`按人员、车辆、火焰的类别阈值进行二次过滤。
+7. `RgbDetector`按人员、车辆、火焰和烟雾的类别阈值进行二次过滤；
+8. 对烟雾框计算去重覆盖率、最高置信度和质心，交给烟雾多源估计模块。
 
 当前没有真实深度时，使用目标框高度进行单目粗测距：
 
@@ -307,7 +308,9 @@ YOLO后端处理过程：
 
 该结果标记`depth_valid=False`，只适合链路联调，不能作为实机安全定位依据。正式系统应由RGB-D、双目或LiDAR投影提供深度，并加载真实相机内外参。
 
-官方COCO模型只能覆盖人员和常见车辆；火焰、烟雾、倒地人员等类别需要隧道数据微调。RGB烟雾掩膜接口已能计算覆盖率、平均概率和像素质心，但官方检测模型不输出烟雾掩膜。
+联合模型已接入火焰和烟雾检测，训练数据来自D-Fire与Indoor Fire Smoke。当前烟雾覆盖率由矩形检测框并集近似，不是像素级分割掩膜；倒地人员和隧道域适配仍需要后续数据与训练。
+
+联合模型独立测试结果：D-Fire测试集`mAP50=0.750`、`mAP50-95=0.433`；Indoor Fire Smoke测试集`mAP50=0.789`、`mAP50-95=0.441`。两个域之间仍存在明显差异，因此这些指标不能直接代表真实隧道性能。
 
 ### 3.2 热成像检测
 
@@ -514,7 +517,7 @@ IoU(A,B) = area(A∩B) / area(A∪B)
 
 同类别框按置信度排序，保留最高分框，并删除与其IoU超过配置阈值的重复框。当前配置推理置信度为0.25、NMS IoU阈值为0.50。模型输出后，系统还按照人员、车辆和火焰分别执行第二级业务阈值过滤。
 
-官方`yolo11n.pt`输出COCO类别。本项目将`person/car/truck/bus/motorcycle`映射为内部`ObjectClass`，其他类别暂时丢弃。模型本身不输出真实三维坐标，当前仅用框高和类别先验高度估算距离：
+官方`yolo11n.pt`输出COCO类别，联合权重输出`smoke/fire`。本项目将`person/car/truck/bus/motorcycle/fire/flame/smoke`映射为内部`ObjectClass`，其他类别丢弃。模型本身不输出真实三维坐标，当前仅用框高和类别先验高度估算距离：
 
 ```text
 Z = fy × Hreal / hpixel
@@ -967,18 +970,19 @@ python3 scripts/run_demo.py
 python3 scripts/run_visualizer.py --port 9100
 ```
 
-### 12.2 YOLO官方基准后端
+### 12.2 YOLO双模型后端
 
 ```bash
 python3 -m pip install -e '.[yolo]'
 python3 scripts/run_visualizer.py \
   --rgb-backend yolo \
   --yolo-model yolo11n.pt \
-  --yolo-device cpu \
+  --fire-smoke-model runs/rgb_fire_smoke/yolo11n_dfire_indoor_joint_sgd/weights/best.pt \
+  --yolo-device 0 \
   --port 9100
 ```
 
-使用NVIDIA GPU时可设置`--yolo-device 0`。官方模型首次运行可能下载权重。内置仿真图像只是几何块，不适合作为YOLO效果验证素材，应使用真实照片或摄像头帧。
+主配置已经启用上述联合权重和GPU 0，命令行参数可用于临时覆盖。官方模型首次运行可能下载权重。内置仿真图像只是几何块，不适合作为YOLO效果验证素材，应使用真实照片或摄像头帧。
 
 ## 13. 测试与验证状态
 
@@ -993,10 +997,10 @@ python3 scripts/run_visualizer.py \
 - 非单位坐标变换；
 - 巡检模式和PM优先级；
 - Web负载和控制动作；
-- YOLO COCO类别映射与空输入；
+- YOLO双模型结果合并、COCO/火情类别映射、烟雾摘要与空输入；
 - 人体低温差检测、高温核心排除和热点质心坐标。
 
-最近一次全量结果为25项测试通过。执行方式：
+最近一次全量结果为31项测试通过。执行方式：
 
 ```bash
 python3 -m unittest discover -s tests -v
@@ -1008,14 +1012,14 @@ python3 -m unittest discover -s tests -v
 
 1. YAML配置加载、深度合并和任务模式；
 2. 多传感器统一输入及近似时间同步；
-3. RGB后端接口和YOLO11n官方基准适配；
+3. RGB后端接口、YOLO11n官方COCO模型与火焰烟雾联合模型接入；
 4. 热成像、LiDAR、毫米波、烟雾和气体传统算法；
 5. 人员、火源和车辆目标级多源融合；
 6. 地图坐标转换、统一轨迹和轨迹生命周期；
 7. 四级退化状态、动态权重、风险事件和安全建议；
 8. 裂缝、积水、设施检测接口及合成后端；
 9. 终端演示、HTTP API、SSE和Canvas可视化；
-10. ROS 2最小包装和25项自动化测试。
+10. ROS 2最小包装和31项自动化测试。
 
 ## 15. 未完成内容与风险
 
@@ -1028,8 +1032,8 @@ python3 -m unittest discover -s tests -v
 
 ### 15.2 P0：模型与三维定位
 
-- 用真实图片/视频验证YOLO后端；
-- 训练火焰、烟雾和倒地人员等隧道专用类别；
+- 已用公开数据集测试图像验证火焰烟雾联合模型；下一步补充真实隧道视频验证；
+- 继续训练倒地人员与隧道域专用类别，并进行难例增量训练；
 - 接入RGB-D或LiDAR投影，替换单目框高测距；
 - 增加模型超时、异常输出和GPU故障降级；
 - 导出ONNX/TensorRT并验证Jetson FP16性能。

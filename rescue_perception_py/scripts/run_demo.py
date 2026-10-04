@@ -34,6 +34,8 @@ def main() -> int:
                         help="override the configured RGB inference backend")
     parser.add_argument("--yolo-model", default=None,
                         help="Ultralytics model path/name, e.g. yolo11n.pt")
+    parser.add_argument("--fire-smoke-model", default=None,
+                        help="joint fire/smoke YOLO weights path")
     parser.add_argument("--yolo-device", default=None,
                         help="Ultralytics device, e.g. cpu, 0 or 0,1")
     args = parser.parse_args()
@@ -56,6 +58,8 @@ def main() -> int:
     rgb_params = config.detectors["rgb_detector"]
     if args.yolo_model:
         rgb_params["model_path"] = args.yolo_model
+    if args.fire_smoke_model:
+        rgb_params["fire_smoke_model_path"] = args.fire_smoke_model
     if args.yolo_device:
         rgb_params["device"] = args.yolo_device
     rgb_backend = args.rgb_backend or str(rgb_params.get("backend", "synthetic"))

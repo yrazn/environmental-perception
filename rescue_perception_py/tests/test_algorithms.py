@@ -8,6 +8,9 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 from rescue_perception.config import PerceptionConfig
 from rescue_perception.detectors.gas_risk import GasRiskAssessor
+from rescue_perception.detectors.lidar2d_safety import Lidar2DSafety
+from rescue_perception.detectors.lidar_cluster import LidarCluster
+from rescue_perception.detectors.radar_tracker import RadarTracker
 from rescue_perception.detectors.smoke_estimator import SmokeEstimator
 from rescue_perception.detectors.thermal_detector import ThermalDetector
 from rescue_perception.fusion.association import gated_hungarian, hungarian
@@ -114,6 +117,43 @@ class ThermalDetectorTest(unittest.TestCase):
         people = [d for d in result.detections
                   if d.class_id == ObjectClass.PERSON_STANDING]
         self.assertFalse(people)
+
+
+class LidarAndRadarTest(unittest.TestCase):
+    def test_lidar2d_uses_forward_sector_and_assigns_stop_level(self):
+        ranges = np.full(181, 10.0)
+        ranges[90] = 0.8
+        ranges[180] = 0.2  # 侧后方量测不应覆盖正前扇区结果。
+        result = Lidar2DSafety().analyze({"front": ranges})
+        self.assertAlmostEqual(result.front_range, 0.8)
+        self.assertEqual(result.warning_level, 2)
+        self.assertIn("front", result.blocked_sectors)
+
+    def test_lidar_cluster_enforces_maximum_cluster_size(self):
+        cfg = PerceptionConfig.from_dict({
+            "detectors": {"lidar_cluster": {
+                "min_cluster_size": 2,
+                "max_cluster_size": 4,
+                "cluster_tolerance_normal": 0.3,
+            }},
+        })
+        detector = LidarCluster(cfg)
+        points = np.array([[0.01 * i, 0.0, 1.0] for i in range(5)])
+        self.assertEqual(detector._euclidean_cluster(points, 0.3), [])
+
+    def test_radar_uses_elevation_and_doppler_velocity(self):
+        result = RadarTracker().track([{
+            "range": 10.0,
+            "azimuth": 0.0,
+            "elevation": 0.1,
+            "doppler": 2.0,
+            "rcs": 5.0,
+            "micro_doppler_amplitude": 0.8,
+        }], now=0.0)
+        self.assertEqual(len(result), 1)
+        self.assertGreater(result[0].position[2], 0.9)
+        self.assertGreater(result[0].velocity[0], 1.9)
+        self.assertTrue(result[0].extra["micro_doppler"])
 
 
 if __name__ == "__main__":
